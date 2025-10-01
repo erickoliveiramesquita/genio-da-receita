@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gerador de Receitas Gemini</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load React and ReactDOM from a CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Load Babel Standalone -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="importmap">
 {
@@ -20,6 +26,7 @@
 </head>
   <body class="bg-amber-50">
     <div id="root"></div>
-    <script type="text/babel" data-type="module" src="/index.tsx"></script>
+    <!-- Tell Babel to transpile this script -->
+    <script type="text/babel" src="/index.tsx"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+// --- FIX: Add missing React and ReactDOM imports ---
+import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { GoogleGenAI, Type } from "@google/genai";
 
 // --- From types.ts ---
 interface Recipe {
@@ -16,73 +16,28 @@ interface Recipe {
   instructions: string[];
 }
 
-// --- From services/geminiService.ts ---
-const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
-
-const recipeSchema = {
-  type: Type.OBJECT,
-  properties: {
-    recipeName: { type: Type.STRING, description: "O nome da receita." },
-    description: { type: Type.STRING, description: "Uma descrição curta e atraente do prato." },
-    prepTime: { type: Type.STRING, description: "Tempo de preparo estimado, ex: '15 minutos'." },
-    cookTime: { type: Type.STRING, description: "Tempo de cozimento estimado, ex: '25 minutos'." },
-    servings: { type: Type.STRING, description: "Número de porções que a receita rende, ex: '4 porções'." },
-    ingredients: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING, description: "O nome do ingrediente, ex: 'Peito de Frango'." },
-          quantity: { type: Type.STRING, description: "A quantidade do ingrediente, ex: '1 kg' ou '1 xícara'." },
-        },
-        required: ["name", "quantity"],
-      },
-      description: "Uma lista dos ingredientes necessários para a receita, incluindo as quantidades."
-    },
-    instructions: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Instruções passo a passo para o preparo do prato."
-    },
-  },
-  required: ["recipeName", "description", "prepTime", "cookTime", "servings", "ingredients", "instructions"],
-};
-
+// --- New service function to call our secure backend endpoint ---
 const generateRecipe = async (ingredients: string): Promise<Recipe> => {
-    if (!ai) {
-        throw new Error("A chave da API Gemini não está configurada.");
-    }
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ingredients }),
+  });
 
-  const prompt = `
-    Você é um chef criativo. Com base nos seguintes ingredientes, crie uma receita deliciosa e fácil de seguir.
-    Se um ingrediente parecer insuficiente para uma refeição completa (por exemplo, apenas 'sal'), sinta-se à vontade para sugerir uma receita simples que o utilize ou presuma que itens básicos da despensa como óleo, sal, pimenta e água estão disponíveis.
-    
-    Ingredientes: ${ingredients}
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: recipeSchema,
-        temperature: 0.7,
-      },
-    });
-
-    const jsonText = response.text.trim();
-    const recipeData = JSON.parse(jsonText);
-
-    if (!recipeData.recipeName || !Array.isArray(recipeData.ingredients) || !Array.isArray(recipeData.instructions)) {
-        throw new Error("Formato de receita inválido recebido da API.");
-    }
-    
-    return recipeData as Recipe;
-  } catch (error) {
-    console.error("Error generating recipe:", error);
-    throw new Error("Falha ao gerar a receita. O modelo pode estar indisponível ou os ingredientes eram muito incomuns. Por favor, tente novamente.");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Ocorreu um erro desconhecido no servidor.' }));
+    throw new Error(errorData.error || `A solicitação falhou com o status ${response.status}`);
   }
+
+  const recipeData = await response.json();
+  
+  if (!recipeData.recipeName || !Array.isArray(recipeData.ingredients) || !Array.isArray(recipeData.instructions)) {
+      throw new Error("Formato de receita inválido recebido do servidor.");
+  }
+  
+  return recipeData as Recipe;
 };
 
 
@@ -202,18 +157,12 @@ const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
 
 // --- From App.tsx ---
 const App: React.FC = () => {
-  const [ingredients, setIngredients] = useState<string>('');
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [apiKeyIsMissing] = useState(!process.env.API_KEY);
+  const [ingredients, setIngredients] = React.useState<string>('');
+  const [recipe, setRecipe] = React.useState<Recipe | null>(null);
+  const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleGenerateRecipe = useCallback(async () => {
-    if (apiKeyIsMissing) {
-      setError("A chave da API Gemini não está configurada. Por favor, defina a variável de ambiente API_KEY nas configurações do seu projeto Vercel.");
-      return;
-    }
-
+  const handleGenerateRecipe = React.useCallback(async () => {
     if (!ingredients.trim()) {
       setError('Por favor, insira alguns ingredientes.');
       return;
@@ -232,7 +181,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ingredients, apiKeyIsMissing]);
+  }, [ingredients]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -251,18 +200,6 @@ const App: React.FC = () => {
   const handleExampleClick = (example: string) => {
     setIngredients(example);
   };
-
-  if (apiKeyIsMissing) {
-      return (
-          <div className="min-h-screen font-sans text-slate-800 antialiased flex items-center justify-center p-4">
-              <main className="container mx-auto">
-                   <div className="max-w-2xl mx-auto">
-                        <ErrorDisplay message="A chave da API Gemini não está configurada. Por favor, adicione a variável de ambiente API_KEY nas configurações do seu projeto Vercel para que este aplicativo funcione." />
-                   </div>
-              </main>
-          </div>
-      )
-  }
 
   return (
     <div className="min-h-screen font-sans text-slate-800 antialiased">
