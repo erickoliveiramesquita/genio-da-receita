@@ -1,0 +1,5 @@
+{
+  "name": "Gerador de Receitas Gemini",
+  "description": "Um aplicativo que gera receitas deliciosas com base nos ingredientes que você tem disponíveis, com a tecnologia da API Gemini.",
+  "requestFramePermissions": []
+}
